@@ -2,8 +2,8 @@ name: YouTube to X
 
 on:
   schedule:
-    # 10分おき。GitHub側の混雑で遅延する場合があります。
-    - cron: "3,13,23,33,43,53 * * * *"
+    # 5分おきに起動し、config.json の間隔設定に従って実チェックします。
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -38,9 +38,6 @@ jobs:
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
-          POST_TEMPLATE: ${{ vars.POST_TEMPLATE }}
-          LIVE_POST_TEMPLATE: ${{ vars.LIVE_POST_TEMPLATE }}
-          HASHTAGS: ${{ vars.HASHTAGS }}
           MODE: post
         run: python main.py
 
