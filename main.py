@@ -2,11 +2,13 @@ import json
 import os
 import sys
 from pathlib import Path
+from datetime import datetime, timezone
 
 import requests
 from requests_oauthlib import OAuth1
 
 STATE_FILE = Path("state.json")
+CONFIG_FILE = Path("config.json")
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
 
@@ -15,6 +17,35 @@ def require(name: str) -> str:
     if not value:
         raise RuntimeError(f"Missing environment variable: {name}")
     return value
+
+
+def load_config():
+    defaults = {
+        "check_interval_minutes": 10,
+        "normal_post_template": "🎮 新しい動画を公開しました！\\n\\n{title}\\n\\n▶ YouTube\\n{url}",
+        "live_post_template": "🔴 ライブ配信を開始しました！\\n\\n{title}\\n\\n▶ YouTube Live\\n{url}",
+        "hashtags": "",
+    }
+    if not CONFIG_FILE.exists():
+        return defaults
+    data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    defaults.update(data)
+    interval = int(defaults["check_interval_minutes"])
+    if interval not in (5, 10, 15, 20, 30, 60):
+        raise RuntimeError("check_interval_minutes must be one of: 5, 10, 15, 20, 30, 60")
+    defaults["check_interval_minutes"] = interval
+    return defaults
+
+
+def scheduled_time_to_check(interval_minutes: int) -> bool:
+    # workflow自体は5分ごとに起動。手動実行は常にチェックする。
+    if os.getenv("GITHUB_EVENT_NAME", "") == "workflow_dispatch":
+        return True
+    now = datetime.now(timezone.utc)
+    minute_of_hour = now.minute
+    if interval_minutes == 60:
+        return minute_of_hour < 5
+    return minute_of_hour % interval_minutes < 5
 
 
 def load_state():
@@ -121,31 +152,19 @@ def fetch_recent_videos(channel_id: str, api_key: str):
     return [by_id[v] for v in ids if v in by_id]
 
 
-def render_post(template_env: str, default_template: str, video, hashtags: str):
-    template = os.getenv(template_env, "").strip() or default_template
+def render_post(template: str, video, hashtags: str):
     text = template.format(title=video["title"], url=video["url"])
     if hashtags:
         text = f"{text}\n\n{hashtags}"
     return text
 
 
-def build_video_post(video, hashtags):
-    return render_post(
-        "POST_TEMPLATE",
-        "🎮 新しい動画を公開しました！\n\n{title}\n\n▶ YouTube\n{url}",
-        video,
-        hashtags,
-    )
+def build_video_post(video, config):
+    return render_post(config["normal_post_template"], video, config.get("hashtags", "").strip())
 
 
-def build_live_post(video, hashtags):
-    return render_post(
-        "LIVE_POST_TEMPLATE",
-        "🔴 ライブ配信を開始しました！\n\n{title}\n\n▶ YouTube Live\n{url}",
-        video,
-        hashtags,
-    )
-
+def build_live_post(video, config):
+    return render_post(config["live_post_template"], video, config.get("hashtags", "").strip())
 
 def post_to_x(text: str):
     api_key = require("X_API_KEY")
@@ -178,7 +197,11 @@ def main():
     channel_id = require("YOUTUBE_CHANNEL_ID")
     youtube_api_key = require("YOUTUBE_API_KEY")
     mode = os.getenv("MODE", "post").strip().lower()
-    hashtags = os.getenv("HASHTAGS", "").strip()
+    config = load_config()
+
+    if not scheduled_time_to_check(config["check_interval_minutes"]):
+        print(f"Skip: configured interval is {config['check_interval_minutes']} minutes.")
+        return 0
 
     videos = fetch_recent_videos(channel_id, youtube_api_key)
     if not videos:
@@ -214,14 +237,14 @@ def main():
 
         if status == "live":
             print(f"Live started: {video['title']}")
-            send(build_live_post(video, hashtags), mode)
+            send(build_live_post(video, config), mode)
             notified.add(video_id)
             continue
 
         # live終了後に通常動画として二重投稿されないよう、
         # live配信は実配信開始時にnotifiedへ入る。
         print(f"New video: {video['title']}")
-        send(build_video_post(video, hashtags), mode)
+        send(build_video_post(video, config), mode)
         notified.add(video_id)
 
     state["notified_ids"] = list(notified)
