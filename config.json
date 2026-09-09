@@ -1,0 +1,6 @@
+{
+  "check_interval_minutes": 10,
+  "normal_post_template": "🎮 新しい動画を公開しました！\n\n{title}\n\n▶ YouTube\n{url}",
+  "live_post_template": "🔴 ライブ配信を開始しました！\n\n{title}\n\n▶ YouTube Live\n{url}",
+  "hashtags": "#信長の野望 #ゲーム実況"
+}
