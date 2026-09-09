@@ -1,111 +1,59 @@
-# YouTube → X 自動通知（10分間隔・ライブ配信対応）
+# YouTube → X 自動通知（config.json設定版）
 
-YouTubeチャンネルを10分ごとに確認し、通常動画の公開またはライブ配信の開始を検出したときにXへ1回だけ投稿します。
+設定変更を `config.json` にまとめた版です。
 
-## 今回の更新内容
+## 普段変更するファイル
 
-- 確認間隔：15分 → **10分**
-- 通常動画：公開時にXへ投稿
-- ライブ配信：**予約時ではなく、実際に配信が始まった時にXへ投稿**
-- upcoming（配信予約中）は投稿しない
-- 同じ動画・ライブは再投稿しない
-- ライブ終了後に通常動画として二重投稿しない
-- 初回実行では過去動画を誤投稿しない
+`config.json` だけを編集します。
 
-## YouTube APIについて
-
-ライブ状態を正確に判定するため、YouTube Data API v3を使用します。
-
-GitHub Secretsへ以下を追加してください。
-
-- `YOUTUBE_CHANNEL_ID`
-- `YOUTUBE_API_KEY`
-- `X_API_KEY`
-- `X_API_SECRET`
-- `X_ACCESS_TOKEN`
-- `X_ACCESS_TOKEN_SECRET`
-
-YouTube APIキーはGoogle Cloud ConsoleでYouTube Data API v3を有効にして発行します。
-
-この版は1回の確認につき主に以下を使用します。
-
-- channels.list：1ユニット
-- playlistItems.list：1ユニット
-- videos.list：1ユニット
-
-10分ごとなら概算432ユニット/日程度です。YouTube Data APIの標準クォータは通常10,000ユニット/日です。
-
-## Xの投稿文
-
-通常動画の既定文：
-
-```text
-🎮 新しい動画を公開しました！
-
-{title}
-
-▶ YouTube
-{url}
+```json
+{
+  "check_interval_minutes": 10,
+  "normal_post_template": "🎮 新しい動画を公開しました！\n\n{title}\n\n▶ YouTube\n{url}",
+  "live_post_template": "🔴 ライブ配信を開始しました！\n\n{title}\n\n▶ YouTube Live\n{url}",
+  "hashtags": "#信長の野望 #ゲーム実況"
+}
 ```
 
-ライブ配信の既定文：
+### check_interval_minutes
+`5 / 10 / 15 / 20 / 30 / 60` のいずれか。
 
-```text
-🔴 ライブ配信を開始しました！
+GitHub Actions自体は5分ごとに起動し、config.json の設定に該当する回だけYouTubeを確認します。
+手動の「Run workflow」は間隔に関係なく必ず確認します。
 
-{title}
+### normal_post_template
+通常動画のX投稿文。`{title}` と `{url}` は残してください。
 
-▶ YouTube Live
-{url}
-```
+### live_post_template
+ライブ開始時のX投稿文。`{title}` と `{url}` は残してください。
 
-GitHubの
-`Settings → Secrets and variables → Actions → Variables`
-から変更できます。
+### hashtags
+投稿末尾につけるハッシュタグ。不要なら空文字 `""` にします。
 
-### `POST_TEMPLATE`
+## APIキーなど
+機密情報は config.json に入れません。引き続き GitHub Repository secrets で管理します。
 
-通常動画用。
+- YOUTUBE_API_KEY
+- YOUTUBE_CHANNEL_ID
+- X_API_KEY
+- X_API_SECRET
+- X_ACCESS_TOKEN
+- X_ACCESS_TOKEN_SECRET
 
-### `LIVE_POST_TEMPLATE`
+## GitHub上で設定変更する方法
 
-ライブ配信用。
+Code → `config.json` → 鉛筆アイコン → 値を変更 → Commit changes
 
-### `HASHTAGS`
+通常の設定変更では `main.py`、`state.json`、`.github/workflows/youtube-to-x.yml` を触る必要はありません。
 
-共通ハッシュタグ。例：
+## 既存リポジトリへの更新
 
-```text
-#信長の野望 #信長の野望新生PK
-```
+このZIPの中身を既存の `youtube-to-x` リポジトリへ上書きしてください。
+特に以下を更新・追加します。
 
-## 初回実行
+- `main.py`（更新）
+- `.github/workflows/youtube-to-x.yml`（更新）
+- `config.json`（新規）
+- `README.md`（更新）
 
-`Actions → YouTube to X → Run workflow`
-
-初回はX投稿を行わず、現在の動画を基準として記録します。
-
-ただし予約中のライブ（upcoming）は通知済みにしません。
-そのため後で配信が始まると、次回の10分チェック時にライブ通知されます。
-
-## Xへ投稿せずテスト
-
-`.github/workflows/youtube-to-x.yml` の
-
-```yaml
-MODE: post
-```
-
-を
-
-```yaml
-MODE: dry-run
-```
-
-に変更してください。
-
-## 注意
-
-GitHub Actionsのscheduled workflowは10分間隔で設定しますが、GitHub側の混雑などで実際の開始が遅れることがあります。
-
-X API側の投稿料金・仕様は変更される可能性があります。
+`state.json` は現在運用中のものを残すのが安全です。既存の通知済み履歴を消さないため、運用中リポジトリの `state.json` は上書きしないでください。
