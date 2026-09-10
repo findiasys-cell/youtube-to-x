@@ -5,6 +5,15 @@ on:
     # 5分おきに起動し、config.json の間隔設定に従って実チェックします。
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    inputs:
+      test_notification:
+        description: "iPhoneへテスト通知を送る"
+        required: true
+        type: choice
+        options:
+          - "false"
+          - "true"
+        default: "false"
 
 permissions:
   contents: write
@@ -35,9 +44,11 @@ jobs:
           YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TEST_NOTIFICATION: ${{ github.event.inputs.test_notification || 'false' }}
         run: python main.py
 
       - name: Save notification state
+        if: ${{ github.event.inputs.test_notification != 'true' }}
         run: |
           if git diff --quiet state.json; then
             echo "state.json unchanged"
