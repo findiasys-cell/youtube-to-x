@@ -45,7 +45,6 @@ def load_config():
 
 
 def scheduled_time_to_check(interval_minutes: int) -> bool:
-    # workflow自体は5分ごとに起動。手動実行は常にチェックする。
     if os.getenv("GITHUB_EVENT_NAME", "") == "workflow_dispatch":
         return True
 
@@ -188,7 +187,6 @@ def build_live_post(video, config):
 
 
 def build_x_intent_url(text: str) -> str:
-    # X公式Web Intent。APIクレジット不要で、投稿確定だけユーザーが行う。
     return "https://x.com/intent/tweet?" + urlencode({"text": text})
 
 
@@ -239,11 +237,32 @@ def notify_video(video, config, is_live: bool):
     send_iphone_notification(title, message, x_text)
 
 
+def send_test_notification(config):
+    test_url = "https://www.youtube.com/"
+    test_video = {
+        "title": "通知テスト",
+        "url": test_url,
+    }
+    x_text = build_video_post(test_video, config)
+    message = (
+        "✅ iPhone通知テストです。\n"
+        "『Xに投稿』を押すと投稿画面が開きます。\n"
+        f"{test_url}"
+    )
+    send_iphone_notification("YouTube通知テスト", message, x_text)
+    print("Test notification completed.")
+
+
 def main():
+    config = load_config()
+    require("NTFY_TOPIC")
+
+    if os.getenv("TEST_NOTIFICATION", "false").strip().lower() == "true":
+        send_test_notification(config)
+        return 0
+
     channel_id = require("YOUTUBE_CHANNEL_ID")
     youtube_api_key = require("YOUTUBE_API_KEY")
-    require("NTFY_TOPIC")
-    config = load_config()
 
     if not scheduled_time_to_check(config["check_interval_minutes"]):
         print(
@@ -260,8 +279,6 @@ def main():
     state = load_state()
     notified = set(state.get("notified_ids", []))
 
-    # 初回は過去動画を一斉通知しない。
-    # upcomingだけは未通知にして、live開始後に通知できるようにする。
     if not state.get("initialized"):
         for video in videos:
             if video["live_status"] != "upcoming":
