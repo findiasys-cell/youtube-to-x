@@ -284,7 +284,7 @@ def main():
             if video["live_status"] != "upcoming":
                 notified.add(video["id"])
         state["initialized"] = True
-        state["notified_ids"] = list(notified)
+        state["notified_ids"] = sorted(notified)
         save_state(state)
         print("First run: state initialized. No notification was sent.")
         return 0
@@ -310,7 +310,7 @@ def main():
         notify_video(video, config, is_live=False)
         notified.add(video_id)
 
-    state["notified_ids"] = list(notified)
+    state["notified_ids"] = sorted(notified)
     save_state(state)
     return 0
 
