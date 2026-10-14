@@ -2,8 +2,8 @@ name: YouTube to iPhone
 
 on:
   schedule:
-    # 5分おきに起動し、config.json の間隔設定に従って実チェックします。
-    - cron: "*/5 * * * *"
+    # 15分おきに起動し、config.json の間隔設定に従って実チェックします。
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       test_notification:
